@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
-
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -76,7 +75,7 @@ func makeCall(client *rpc.Client, world, newWorld [][]byte, imageHeight, imageWi
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
+func distributor(p Params, c distributorChannels, keyPress <-chan rune) {
 
 	// TODO: Create a 2D slice to store the world.
 	world := make([][]uint8, p.ImageHeight)
@@ -105,17 +104,8 @@ func distributor(p Params, c distributorChannels) {
 		world = newWorld
 		turn++
 	}*/
-
-	go func() {
-		for range ticker.C {
-			if isPaused {
-				mutex.Lock()
-				aliveCells := calculateAliveCells(p, world)
-				c.events <- AliveCellsCount{turn, len(aliveCells)}
-				mutex.Unlock()
-			}
-		}
-	}()
+	//ticker := time.NewTicker(2 * time.Second)
+	//mutex := &sync.Mutex{}
 
 	//hard coding the server addr
 	server := "127.0.0.1:8030"
@@ -125,12 +115,23 @@ func distributor(p Params, c distributorChannels) {
 		log.Fatal("dialing:", err)
 	}
 	defer client.Close()
+	/*go func() {
+		for {
+			select {
+			case <-ticker.C:
+				mutex.Lock()
+				response := makeCall(client, world, newWorld, p.ImageHeight, p.ImageWidth, p.Turns)
+				c.events <- AliveCellsCount{response.CompletedTurns, response.AliveCells}
+			case <-done:
+				return
+			}
+		}
+	}()*/
 
 	response := makeCall(client, world, newWorld, p.ImageHeight, p.ImageWidth, p.Turns)
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 	c.events <- FinalTurnComplete{response.CompletedTurns, calculateAliveCells(p.ImageHeight, p.ImageWidth, response.FinalWorld)}
-
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
