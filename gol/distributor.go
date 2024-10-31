@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -61,7 +62,7 @@ func calculateAliveCells(imageHeight, imageWidth int, world [][]byte) []util.Cel
 	return aliveCells
 }
 
-//CLIENT CODE
+// CLIENT CODE
 // Use AWS Node
 func makeCall(client *rpc.Client, world, newWorld [][]byte, imageHeight, imageWidth, turn int) stubs.Response {
 	request := stubs.Request{World: world, NewWorld: newWorld, ImageHeight: imageHeight, ImageWidth: imageWidth, Turns: turn}
@@ -104,6 +105,17 @@ func distributor(p Params, c distributorChannels) {
 		world = newWorld
 		turn++
 	}*/
+
+	go func() {
+		for range ticker.C {
+			if isPaused {
+				mutex.Lock()
+				aliveCells := calculateAliveCells(p, world)
+				c.events <- AliveCellsCount{turn, len(aliveCells)}
+				mutex.Unlock()
+			}
+		}
+	}()
 
 	//hard coding the server addr
 	server := "127.0.0.1:8030"
