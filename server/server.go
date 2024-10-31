@@ -7,7 +7,20 @@ import (
 	"net/rpc"
 	"time"
 	"uk.ac.bris.cs/gameoflife/stubs"
+	"uk.ac.bris.cs/gameoflife/util"
 )
+
+func calculateAliveCells(imageHeight, imageWidth int, world [][]byte) []util.Cell {
+	var aliveCells []util.Cell
+	for y := 0; y < imageHeight; y++ {
+		for x := 0; x < imageWidth; x++ {
+			if world[y][x] == 255 {
+				aliveCells = append(aliveCells, util.Cell{x, y})
+			}
+		}
+	}
+	return aliveCells
+}
 
 func calculateNextState(imageHeight, imageWidth int, world, resultWorld [][]uint8) {
 	/*resultWorld := make([][]byte, imageHeight)
@@ -40,26 +53,20 @@ func calculateNextState(imageHeight, imageWidth int, world, resultWorld [][]uint
 	}
 }
 
-/**func evolve(imageHeight, imageWidth int, world, newWorld [][]uint8) {
-	calculateNextState(imageHeight, imageWidth, world, newWorld)
-	world, newWorld = newWorld, world
-}**/
-
 type GolOperations struct {
 }
 
 func (s *GolOperations) Evolve(req stubs.Request, res *stubs.Response) (err error) {
 	world := req.World
 	newWorld := req.NewWorld
-
 	turn := 0
 	for turn < req.Turns {
 		calculateNextState(req.ImageHeight, req.ImageWidth, world, newWorld)
 		world, newWorld = newWorld, world
 		turn++
 	}
-	res.FinalWorld = world
 	res.CompletedTurns = turn
+	res.FinalWorld = world
 	return
 }
 

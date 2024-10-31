@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"time"
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
 )
@@ -62,17 +63,6 @@ func calculateAliveCells(imageHeight, imageWidth int, world [][]byte) []util.Cel
 }
 
 // CLIENT CODE
-// Use AWS Node
-func makeCall(client *rpc.Client, world, newWorld [][]byte, imageHeight, imageWidth, turn int) stubs.Response {
-	request := stubs.Request{World: world, NewWorld: newWorld, ImageHeight: imageHeight, ImageWidth: imageWidth, Turns: turn}
-	response := new(stubs.Response)
-	err := client.Call(stubs.GolHandler, request, response)
-	if err != nil {
-		panic(err)
-	}
-	return *response
-	//fmt.Println("Responded: " + response.FinalWorld)
-}
 
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels, keyPress <-chan rune) {
@@ -104,38 +94,45 @@ func distributor(p Params, c distributorChannels, keyPress <-chan rune) {
 		world = newWorld
 		turn++
 	}*/
-	//ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	//
 	//mutex := &sync.Mutex{}
-
+	//done := make(chan bool)
 	//hard coding the server addr
 	server := "127.0.0.1:8030"
 
-	client, err := rpc.Dial("tcp", server)
-	if err != nil {
-		log.Fatal("dialing:", err)
+	client, err1 := rpc.Dial("tcp", server)
+	if err1 != nil {
+		log.Fatal("dialing:", err1)
 	}
 	defer client.Close()
-	/*go func() {
-		for {
-			select {
-			case <-ticker.C:
-				mutex.Lock()
-				response := makeCall(client, world, newWorld, p.ImageHeight, p.ImageWidth, p.Turns)
-				c.events <- AliveCellsCount{response.CompletedTurns, response.AliveCells}
-			case <-done:
-				return
-			}
+
+	request := stubs.Request{World: world, NewWorld: newWorld, ImageHeight: p.ImageHeight, ImageWidth: p.ImageWidth, Turns: p.Turns}
+	response := new(stubs.Response)
+	err2 := client.Call(stubs.GolHandler, request, response)
+	if err2 != nil {
+		panic(err2)
+	}
+
+	//go func() {
+	/*for {
+		select {
+		case <-a.Done:
+			break
+		case <-ticker.C:
+			fmt.Println("2 seconds")
 		}
-	}()*/
-
-	response := makeCall(client, world, newWorld, p.ImageHeight, p.ImageWidth, p.Turns)
-
+	}*/
+	//}()
+	//
+	//response := makeCall1(client, world, newWorld, p.ImageHeight, p.ImageWidth, p.Turns)
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 	c.events <- FinalTurnComplete{response.CompletedTurns, calculateAliveCells(p.ImageHeight, p.ImageWidth, response.FinalWorld)}
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
-
+	//done <- true
 	c.events <- StateChange{turn, Quitting}
 
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
